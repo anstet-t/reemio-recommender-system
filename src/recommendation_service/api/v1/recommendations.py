@@ -6,8 +6,13 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from recommendation_service.config import Settings, get_settings
+from recommendation_service.infrastructure.database.connection import get_session
+from recommendation_service.services.recommendation_engine_v2 import (
+    HybridRecommendationEngine,
+)
 
 router = APIRouter()
 
@@ -49,6 +54,7 @@ class RecommendationResponse(BaseModel):
 async def get_homepage_recommendations(
     user_id: Annotated[str, Query(description="User ID for personalization")],
     limit: Annotated[int, Query(ge=1, le=50)] = 12,
+    session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> RecommendationResponse:
     """
@@ -58,24 +64,26 @@ async def get_homepage_recommendations(
     based on their interaction history (views, purchases, cart activity).
 
     **Algorithm:**
-    1. Fetch user preference vector from Pinecone
+    1. Fetch user preference vector
     2. Search products index with user preference
     3. Apply diversity strategies (limit per category)
-    4. Rerank results for optimal relevance
+    4. Return ranked results
 
     **Usage in UI:**
     - Homepage "Recommended for You" section
     - Personalized product carousel
     """
-    # TODO: Implement actual recommendation logic
-    # For now, return placeholder response
+    engine = HybridRecommendationEngine(session)
+    result = await engine.get_homepage_recommendations(user_id=user_id, limit=limit)
 
     return RecommendationResponse(
-        recommendations=[],
-        request_id=str(uuid4()),
-        context="homepage",
-        user_id=user_id,
-        generated_at=datetime.now(timezone.utc).isoformat(),
+        recommendations=[
+            RecommendedProduct(**p) for p in result["recommendations"]
+        ],
+        request_id=result["request_id"],
+        context=result["context"],
+        user_id=result["user_id"],
+        generated_at=result["generated_at"],
     )
 
 
@@ -84,6 +92,7 @@ async def get_similar_products(
     product_id: str,
     user_id: Annotated[str | None, Query(description="Optional user ID for personalization")] = None,
     limit: Annotated[int, Query(ge=1, le=50)] = 8,
+    session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> RecommendationResponse:
     """
@@ -93,23 +102,28 @@ async def get_similar_products(
     optionally personalized if user_id is provided.
 
     **Algorithm:**
-    1. Fetch source product embedding from Pinecone
+    1. Fetch source product embedding
     2. Search for similar products (excluding source)
     3. Optionally blend with user preferences
-    4. Rerank for relevance
+    4. Return ranked results
 
     **Usage in UI:**
     - Product page "Similar Products" section
     - "You might also like" carousel
     """
-    # TODO: Implement actual recommendation logic
+    engine = HybridRecommendationEngine(session)
+    result = await engine.get_similar_products(
+        product_id=product_id, user_id=user_id, limit=limit
+    )
 
     return RecommendationResponse(
-        recommendations=[],
-        request_id=str(uuid4()),
-        context="product_page",
-        user_id=user_id,
-        generated_at=datetime.now(timezone.utc).isoformat(),
+        recommendations=[
+            RecommendedProduct(**p) for p in result["recommendations"]
+        ],
+        request_id=result["request_id"],
+        context=result["context"],
+        user_id=result["user_id"],
+        generated_at=result["generated_at"],
     )
 
 
@@ -118,6 +132,7 @@ async def get_cart_recommendations(
     user_id: Annotated[str, Query(description="User ID")],
     cart_product_ids: Annotated[list[str], Query(description="Product IDs in cart")],
     limit: Annotated[int, Query(ge=1, le=20)] = 6,
+    session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> RecommendationResponse:
     """
@@ -131,7 +146,7 @@ async def get_cart_recommendations(
     2. Aggregate embeddings (weighted average)
     3. Search for complementary products (excluding cart items)
     4. Filter by price range relative to cart total
-    5. Rerank for relevance
+    5. Return ranked results
 
     **Usage in UI:**
     - Cart page "Complete your order" section
@@ -143,14 +158,19 @@ async def get_cart_recommendations(
             detail="cart_product_ids must not be empty",
         )
 
-    # TODO: Implement actual recommendation logic
+    engine = HybridRecommendationEngine(session)
+    result = await engine.get_cart_recommendations(
+        user_id=user_id, cart_product_ids=cart_product_ids, limit=limit
+    )
 
     return RecommendationResponse(
-        recommendations=[],
-        request_id=str(uuid4()),
-        context="cart",
-        user_id=user_id,
-        generated_at=datetime.now(timezone.utc).isoformat(),
+        recommendations=[
+            RecommendedProduct(**p) for p in result["recommendations"]
+        ],
+        request_id=result["request_id"],
+        context=result["context"],
+        user_id=result["user_id"],
+        generated_at=result["generated_at"],
     )
 
 
@@ -161,6 +181,7 @@ async def get_cart_recommendations(
 async def get_frequently_bought_together(
     product_id: str,
     limit: Annotated[int, Query(ge=1, le=10)] = 4,
+    session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> RecommendationResponse:
     """
@@ -179,12 +200,17 @@ async def get_frequently_bought_together(
     - Product page "Frequently Bought Together" section
     - Bundle suggestions
     """
-    # TODO: Implement actual recommendation logic
+    engine = HybridRecommendationEngine(session)
+    result = await engine.get_frequently_bought_together(
+        product_id=product_id, limit=limit
+    )
 
     return RecommendationResponse(
-        recommendations=[],
-        request_id=str(uuid4()),
-        context="frequently_bought_together",
-        user_id=None,
-        generated_at=datetime.now(timezone.utc).isoformat(),
+        recommendations=[
+            RecommendedProduct(**p) for p in result["recommendations"]
+        ],
+        request_id=result["request_id"],
+        context=result["context"],
+        user_id=result["user_id"],
+        generated_at=result["generated_at"],
     )
