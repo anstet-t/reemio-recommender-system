@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: recommender-config
+  namespace: reemio-recommender
+data:
+  APP_ENV: "production"
+  LOG_LEVEL: "INFO"
+  API_HOST: "0.0.0.0"
+  API_PORT: "8000"
+  ECOMMERCE_API_BASE_URL: "https://gateway-ecommerce.reemioltd.com"
+  EMBEDDING_MODEL: "sentence-transformers/all-MiniLM-L6-v2"
+  EMBEDDING_DIMENSION: "384"
+  DEFAULT_RECOMMENDATION_LIMIT: "12"
+  MAX_RECOMMENDATION_LIMIT: "50"
+  CART_ABANDONMENT_DELAY_HOURS: "2"
+  WEEKLY_DIGEST_DAY: "sunday"
+  WEEKLY_DIGEST_HOUR: "10"

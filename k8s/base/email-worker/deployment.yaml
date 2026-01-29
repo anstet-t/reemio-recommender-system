@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: email-worker
+  namespace: reemio-recommender
+  labels:
+    app: email-worker
+    app.kubernetes.io/name: email-worker
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/part-of: reemio-recommender
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: email-worker
+  template:
+    metadata:
+      labels:
+        app: email-worker
+        app.kubernetes.io/name: email-worker
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/reemio/reemio-recommender-worker:latest
+          imagePullPolicy: Always
+          command: ["celery", "-A", "email_worker.main", "worker", "--loglevel=info", "-Q", "email"]
+          envFrom:
+            - configMapRef:
+                name: recommender-config
+            - secretRef:
+                name: recommender-secrets
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+      restartPolicy: Always

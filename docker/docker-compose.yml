@@ -1,0 +1,200 @@
+version: '3.8'
+
+services:
+  # =============================================================================
+  # Recommendation API
+  # =============================================================================
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=development
+      - DEBUG=true
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=reemio
+      - POSTGRES_PASSWORD=reemio_dev_password
+      - POSTGRES_DB=reemio_recommender
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PINECONE_API_KEY=${PINECONE_API_KEY}
+      - ECOMMERCE_API_BASE_URL=${ECOMMERCE_API_BASE_URL:-https://gateway-ecommerce.reemioltd.com}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../src:/app/src:ro
+    networks:
+      - reemio-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # =============================================================================
+  # Email Worker
+  # =============================================================================
+  email-worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.worker
+    command: celery -A email_worker.main worker --loglevel=info -Q email
+    environment:
+      - APP_ENV=development
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=reemio
+      - POSTGRES_PASSWORD=reemio_dev_password
+      - POSTGRES_DB=reemio_recommender
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - PINECONE_API_KEY=${PINECONE_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../src:/app/src:ro
+    networks:
+      - reemio-network
+
+  # =============================================================================
+  # Sync Worker
+  # =============================================================================
+  sync-worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.worker
+    command: celery -A sync_worker.main worker --loglevel=info -Q sync
+    environment:
+      - APP_ENV=development
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=reemio
+      - POSTGRES_PASSWORD=reemio_dev_password
+      - POSTGRES_DB=reemio_recommender
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - PINECONE_API_KEY=${PINECONE_API_KEY}
+      - ECOMMERCE_API_BASE_URL=${ECOMMERCE_API_BASE_URL:-https://gateway-ecommerce.reemioltd.com}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../src:/app/src:ro
+    networks:
+      - reemio-network
+
+  # =============================================================================
+  # Celery Beat (Scheduler)
+  # =============================================================================
+  celery-beat:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.worker
+    command: celery -A email_worker.main beat --loglevel=info
+    environment:
+      - APP_ENV=development
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../src:/app/src:ro
+    networks:
+      - reemio-network
+
+  # =============================================================================
+  # PostgreSQL Database
+  # =============================================================================
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=reemio
+      - POSTGRES_PASSWORD=reemio_dev_password
+      - POSTGRES_DB=reemio_recommender
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - reemio-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reemio -d reemio_recommender"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =============================================================================
+  # Redis
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - reemio-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =============================================================================
+  # PgAdmin (Optional - for database management)
+  # =============================================================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@reemio.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - reemio-network
+    profiles:
+      - tools
+
+  # =============================================================================
+  # Redis Commander (Optional - for Redis management)
+  # =============================================================================
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - reemio-network
+    profiles:
+      - tools
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  reemio-network:
+    driver: bridge

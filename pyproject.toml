@@ -1,0 +1,226 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reemio-recommender"
+version = "1.0.0"
+description = "E-commerce recommendation system with personalized product recommendations, email campaigns, and analytics"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "Reemio Team"}
+]
+keywords = [
+    "recommendation-system",
+    "e-commerce",
+    "machine-learning",
+    "pinecone",
+    "fastapi",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Framework :: FastAPI",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    # Web Framework
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+
+    # Database
+    "sqlalchemy>=2.0.25",
+    "asyncpg>=0.29.0",
+    "alembic>=1.13.0",
+    "greenlet>=3.0.0",
+
+    # Vector Database (pgvector via SQLAlchemy)
+    "pgvector>=0.2.0",
+
+    # Redis & Celery
+    "redis>=5.0.0",
+    "celery[redis]>=5.3.0",
+
+    # HTTP Client
+    "httpx>=0.26.0",
+    "aiohttp>=3.9.0",
+
+    # Utilities
+    "python-dotenv>=1.0.0",
+    "structlog>=24.1.0",
+    "orjson>=3.9.0",
+    "tenacity>=8.2.0",
+
+    # Email Templates
+    "jinja2>=3.1.0",
+
+    # Monitoring
+    "prometheus-client>=0.19.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    # Testing
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "httpx>=0.26.0",
+    "factory-boy>=3.3.0",
+    "faker>=22.0.0",
+
+    # Linting & Formatting
+    "ruff>=0.1.0",
+    "mypy>=1.8.0",
+    "black>=24.1.0",
+    "isort>=5.13.0",
+
+    # Type stubs
+    "types-redis>=4.6.0",
+    "sqlalchemy-stubs>=0.4",
+]
+
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.5.0",
+    "mkdocstrings[python]>=0.24.0",
+]
+
+[project.scripts]
+reemio-api = "recommendation_service.main:run"
+reemio-worker = "email_worker.main:run"
+reemio-sync = "sync_worker.main:run"
+
+[project.urls]
+Homepage = "https://github.com/reemio/reemio-recommender-system"
+Documentation = "https://github.com/reemio/reemio-recommender-system#readme"
+Repository = "https://github.com/reemio/reemio-recommender-system"
+Issues = "https://github.com/reemio/reemio-recommender-system/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+# =============================================================================
+# Ruff Configuration
+# =============================================================================
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+    "ARG",    # flake8-unused-arguments
+    "SIM",    # flake8-simplify
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # do not perform function calls in argument defaults
+    "B904",   # raise without from inside except
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*" = ["ARG", "S101"]
+"**/migrations/**/*" = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["recommendation_service", "email_worker", "sync_worker", "shared"]
+
+# =============================================================================
+# Black Configuration
+# =============================================================================
+[tool.black]
+target-version = ["py311"]
+line-length = 100
+
+# =============================================================================
+# MyPy Configuration
+# =============================================================================
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+exclude = [
+    "migrations",
+    "build",
+    "dist",
+]
+
+[[tool.mypy.overrides]]
+module = [
+    "celery.*",
+    "redis.*",
+    "pinecone.*",
+]
+ignore_missing_imports = true
+
+# =============================================================================
+# Pytest Configuration
+# =============================================================================
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = [
+    "-ra",
+    "-q",
+    "--strict-markers",
+    "--strict-config",
+]
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "e2e: marks tests as end-to-end tests",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+# =============================================================================
+# Coverage Configuration
+# =============================================================================
+[tool.coverage.run]
+source = ["src"]
+branch = true
+omit = [
+    "*/migrations/*",
+    "*/__init__.py",
+    "*/config.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+fail_under = 80
+show_missing = true

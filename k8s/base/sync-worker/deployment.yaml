@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sync-worker
+  namespace: reemio-recommender
+  labels:
+    app: sync-worker
+    app.kubernetes.io/name: sync-worker
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/part-of: reemio-recommender
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sync-worker
+  template:
+    metadata:
+      labels:
+        app: sync-worker
+        app.kubernetes.io/name: sync-worker
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/reemio/reemio-recommender-worker:latest
+          imagePullPolicy: Always
+          command: ["celery", "-A", "sync_worker.main", "worker", "--loglevel=info", "-Q", "sync"]
+          envFrom:
+            - configMapRef:
+                name: recommender-config
+            - secretRef:
+                name: recommender-secrets
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+      restartPolicy: Always
