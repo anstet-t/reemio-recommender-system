@@ -216,14 +216,44 @@ uv run python scripts/update_preferences.py
 
 ---
 
+## Deployment on Render
+
+The project includes a `render.yaml` for easy deployment:
+
+1. Push code to GitHub
+2. Go to [Render Dashboard](https://dashboard.render.com/) → **New** → **Blueprint**
+3. Connect your repository
+4. Render prompts for database credentials (use your existing Reemio database)
+5. Deploy
+
+### Environment Variables
+
+Render will prompt for these during deployment:
+
+| Variable | Value |
+|----------|-------|
+| `POSTGRES_HOST` | Your existing database host |
+| `POSTGRES_PORT` | Your existing database port |
+| `POSTGRES_USER` | Your existing database user |
+| `POSTGRES_PASSWORD` | Your existing database password |
+| `POSTGRES_DB` | Your existing database name |
+
+### After Deployment
+
+The app serves everything from one URL:
+- `/` → Frontend demo
+- `/docs` → API documentation
+- `/api/v1/*` → API endpoints
+
+---
+
 ## Next Steps (Recommendations)
 
 1. **Enable pgvector** - Install extension for 10-20x performance improvement
 2. **Add authentication** - Current API uses user_id in URL (see SECURITY.md)
 3. **Set up Redis** - Enable caching for high-traffic scenarios
-4. **Deploy to cloud** - Render, Railway, or AWS ready
-5. **A/B testing** - Compare recommendation strategies
-6. **Email integration** - Connect to your email service provider
+4. **A/B testing** - Compare recommendation strategies
+5. **Email integration** - Connect to your email service provider (replace MockEmailSender)
 
 ---
 

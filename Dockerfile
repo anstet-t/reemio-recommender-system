@@ -1,12 +1,3 @@
-# =============================================================================
-# Reemio Recommender System - API Dockerfile
-# =============================================================================
-# Multi-stage build for optimized production image
-# Serves both API and frontend from a single container
-
-# -----------------------------------------------------------------------------
-# Stage 1: Build
-# -----------------------------------------------------------------------------
 FROM python:3.11-slim as builder
 
 WORKDIR /app
@@ -22,9 +13,6 @@ ENV PATH="/root/.local/bin:$PATH"
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 
-# -----------------------------------------------------------------------------
-# Stage 2: Production
-# -----------------------------------------------------------------------------
 FROM python:3.11-slim as production
 
 WORKDIR /app
@@ -50,11 +38,12 @@ USER reemio
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app/src \
-    APP_ENV=production
+    APP_ENV=production \
+    PORT=8000
 
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/api/v1/health || exit 1
 
-CMD ["uvicorn", "recommendation_service.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD uvicorn recommendation_service.main:app --host 0.0.0.0 --port $PORT

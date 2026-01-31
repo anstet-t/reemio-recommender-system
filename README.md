@@ -377,7 +377,17 @@ The seeded data includes users with distinct shopping personas:
 
 ## Deployment
 
-### Using Docker Compose
+### Deploy to Render (Recommended)
+
+The project includes a `render.yaml` for easy deployment:
+
+1. Push code to GitHub
+2. Go to [Render Dashboard](https://dashboard.render.com/) → **New** → **Blueprint**
+3. Connect your repository
+4. Enter your existing database credentials when prompted
+5. Deploy - app serves frontend + API from one URL
+
+### Using Docker Compose (Local)
 
 ```bash
 # Start all services
@@ -389,6 +399,21 @@ docker-compose logs -f api
 
 # Stop services
 docker-compose down
+```
+
+### Build Docker Image Manually
+
+```bash
+# Build the image
+docker build -t reemio-recommender .
+
+# Run with environment variables
+docker run -p 8000:8000 \
+  -e POSTGRES_HOST=your-db-host \
+  -e POSTGRES_USER=your-user \
+  -e POSTGRES_PASSWORD=your-password \
+  -e POSTGRES_DB=your-db \
+  reemio-recommender
 ```
 
 ### Kubernetes
