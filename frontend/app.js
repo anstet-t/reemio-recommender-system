@@ -48,7 +48,7 @@ function updateCartUI() {
     }
 
     const total = state.cart.reduce((sum, item) => sum + item.price, 0);
-    elements.cartTotal.textContent = `$${total.toFixed(2)}`;
+    elements.cartTotal.textContent = `KES ${total.toLocaleString()}`;
 
     elements.cartItems.innerHTML = state.cart.map(item => `
         <div class="cart-item">
@@ -56,7 +56,7 @@ function updateCartUI() {
             <div class="cart-item-info">
                 <div class="cart-item-name">${item.name}</div>
                 <div class="cart-item-category">${item.category}</div>
-                <div class="cart-item-price">$${item.price.toFixed(2)}</div>
+                <div class="cart-item-price">KES ${item.price.toLocaleString()}</div>
             </div>
             <button class="remove-from-cart" onclick="removeFromCart('${item.product_id}')">×</button>
         </div>
@@ -121,7 +121,7 @@ function renderProduct(product, showSimilarBtn = false) {
                 <div class="product-category">${product.category}</div>
                 <div class="product-name">${product.name}</div>
                 <div class="product-footer">
-                    <div class="product-price">$${product.price.toFixed(2)}</div>
+                    <div class="product-price">KES ${product.price.toLocaleString()}</div>
                     <button class="add-to-cart-btn" onclick="event.stopPropagation(); addToCart(${JSON.stringify(product).replace(/"/g, '&quot;')})">
                         Add to Cart
                     </button>
@@ -175,7 +175,7 @@ async function loadSimilarProducts(productId) {
                 <div class="selected-product-info">
                     <div class="product-category">${sourceProduct.category}</div>
                     <h3>${sourceProduct.name}</h3>
-                    <div class="product-price">$${sourceProduct.price.toFixed(2)}</div>
+                    <div class="product-price">KES ${sourceProduct.price.toLocaleString()}</div>
                 </div>
             `;
         }
