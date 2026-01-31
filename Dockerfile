@@ -18,7 +18,7 @@ FROM python:3.11-slim AS production
 
 WORKDIR /app
 
-RUN groupadd -r reemio && useradd -r -g reemio reemio
+RUN groupadd -r reemio && useradd -r -g reemio -m -d /home/reemio reemio
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
@@ -40,7 +40,9 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app/src \
     APP_ENV=production \
-    PORT=8000
+    PORT=8000 \
+    HF_HOME=/home/reemio/.cache/huggingface \
+    TRANSFORMERS_CACHE=/home/reemio/.cache/huggingface
 
 EXPOSE 8000
 
