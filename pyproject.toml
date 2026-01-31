@@ -55,14 +55,16 @@ dependencies = [
     "prometheus-client>=0.19.0",
     "psycopg2-binary>=2.9.11",
     "sentence-transformers>=5.2.2",
-    "jupyter>=1.1.1",
-    "ipykernel>=7.1.0",
-    "plotly>=6.5.2",
-    "umap-learn>=0.5.11",
 ]
 
 [project.optional-dependencies]
 dev = [
+    # Notebooks & Visualization
+    "jupyter>=1.1.1",
+    "ipykernel>=7.1.0",
+    "plotly>=6.5.2",
+    "umap-learn>=0.5.11",
+
     # Testing
     "pytest>=7.4.0",
     "pytest-asyncio>=0.23.0",
