@@ -23,6 +23,8 @@ RUN groupadd -r reemio && useradd -r -g reemio reemio
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     curl \
+    && curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared \
+    && chmod +x /usr/local/bin/cloudflared \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder --chown=reemio:reemio /app/.venv /app/.venv
@@ -45,4 +47,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/api/v1/health || exit 1
 
-CMD uvicorn recommendation_service.main:app --host 0.0.0.0 --port $PORT
+CMD cloudflared access tcp --hostname ecommerce-db.reemioltd.com --url localhost:5433 & \
+    sleep 2 && \
+    uvicorn recommendation_service.main:app --host 0.0.0.0 --port $PORT

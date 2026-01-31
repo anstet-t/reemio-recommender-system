@@ -10,9 +10,9 @@ services:
       - key: DEBUG
         value: "false"
       - key: POSTGRES_HOST
-        sync: false
+        value: localhost
       - key: POSTGRES_PORT
-        sync: false
+        value: "5433"
       - key: POSTGRES_USER
         sync: false
       - key: POSTGRES_PASSWORD
