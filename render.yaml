@@ -21,3 +21,5 @@ services:
         sync: false
       - key: CORS_ORIGINS
         value: "*"
+      - key: DISABLE_RERANKER
+        value: "true"

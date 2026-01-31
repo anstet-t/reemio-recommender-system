@@ -1,16 +1,21 @@
 """Reranking service using cross-encoder models."""
 
+import os
 import structlog
 
 logger = structlog.get_logger()
 
-# Lazy-loaded reranker model
 _reranker_model = None
+_reranker_disabled = os.getenv("DISABLE_RERANKER", "false").lower() == "true"
 
 
 def get_reranker_model():
-    """Get or initialize the reranker model."""
     global _reranker_model
+
+    if _reranker_disabled:
+        logger.info("Reranker disabled via DISABLE_RERANKER env var")
+        return None
+
     if _reranker_model is None:
         try:
             from sentence_transformers import CrossEncoder
