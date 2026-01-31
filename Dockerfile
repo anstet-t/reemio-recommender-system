@@ -18,8 +18,6 @@ FROM python:3.11-slim AS production
 
 WORKDIR /app
 
-RUN groupadd -r reemio && useradd -r -g reemio -m -d /home/reemio reemio
-
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     curl \
@@ -27,22 +25,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && chmod +x /usr/local/bin/cloudflared \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder --chown=reemio:reemio /app/.venv /app/.venv
+COPY --from=builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
-COPY --chown=reemio:reemio src/ ./src/
-COPY --chown=reemio:reemio frontend/ ./frontend/
-COPY --chown=reemio:reemio alembic.ini ./
-
-USER reemio
+COPY src/ ./src/
+COPY frontend/ ./frontend/
+COPY alembic.ini ./
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app/src \
     APP_ENV=production \
-    PORT=8000 \
-    HF_HOME=/home/reemio/.cache/huggingface \
-    TRANSFORMERS_CACHE=/home/reemio/.cache/huggingface
+    PORT=8000
 
 EXPOSE 8000
 
