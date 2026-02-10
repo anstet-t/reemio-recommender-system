@@ -689,6 +689,73 @@ class HybridRecommendationEngine:
             return []
         return np.mean(np.array(embeddings, dtype=np.float32), axis=0).tolist()
 
+    async def get_search_recommendations(
+        self,
+        query: str,
+        user_id: str | None = None,
+        limit: int = 12,
+        category: str | None = None,
+        diversity_limit_per_category: int = 4,
+    ) -> dict[str, Any]:
+        """Get recommendations based on a search query.
+
+        4-stage pipeline:
+        1. PG full-text search + trigram for candidate retrieval
+        2. Blend text search score with embedding cosine similarity
+        3. Optional Pinecone reranking
+        4. Diversity + stock filtering business rules
+        """
+        from recommendation_service.services.search import SearchService
+
+        request_id = str(uuid4())
+        search_service = SearchService(self.session)
+
+        # Get user preferences for personalization
+        user_categories = None
+        if user_id:
+            user_prefs = await self._get_user_preference_data(user_id)
+            user_categories = user_prefs.get("top_categories")
+
+        # Stage 1: PG full-text + trigram candidate retrieval
+        candidates = await search_service.search_products(
+            query=query,
+            limit=limit * 3,
+            category=category,
+            user_categories=user_categories,
+        )
+
+        if not candidates:
+            return self._empty_response(request_id, "search", user_id)
+
+        # Stage 2: Blend with embedding cosine similarity
+        query_embedding = self.embedding_service.generate_embedding(query)
+        candidates = search_service.blend_with_embeddings(candidates, query_embedding)
+
+        # Stage 3: Optional Pinecone reranking
+        if self.reranker and len(candidates) > 1:
+            candidates = self._rerank_and_normalize(query, candidates, top_k=limit * 2)
+
+        # Stage 4: Business rules
+        candidates = self._apply_diversity(candidates, diversity_limit_per_category)
+        candidates = self._apply_business_rules(candidates)
+        candidates = candidates[:limit]
+
+        for i, p in enumerate(candidates):
+            p["position"] = i + 1
+            p["score"] = max(0.0, min(1.0, p.get("score", 0.5)))
+            # Clean up internal scoring fields
+            p.pop("text_score", None)
+            p.pop("_embedding_raw", None)
+
+        return {
+            "recommendations": candidates,
+            "request_id": request_id,
+            "context": "search",
+            "user_id": user_id,
+            "search_query": query,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
     def _empty_response(
         self, request_id: str, context: str, user_id: str | None
     ) -> dict[str, Any]:

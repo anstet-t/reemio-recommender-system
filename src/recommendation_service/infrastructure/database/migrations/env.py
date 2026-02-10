@@ -87,6 +87,14 @@ def run_migrations_online() -> None:
             print(f"Note: pgvector extension not available, using JSON for embeddings.")
             print("Install pgvector for native vector search functionality.")
 
+        # Create pg_trgm extension for fuzzy text search
+        try:
+            connection.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
+            connection.commit()
+        except Exception as e:
+            connection.rollback()
+            print(f"Note: pg_trgm extension not available: {e}")
+
         context.configure(
             connection=connection,
             target_metadata=target_metadata,

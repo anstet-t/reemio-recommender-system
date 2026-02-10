@@ -1,11 +1,11 @@
 """Recommendation API endpoints."""
 
-from datetime import datetime, timezone
 from typing import Annotated
-from uuid import uuid4
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from recommendation_service.config import Settings, get_settings
@@ -14,6 +14,8 @@ from recommendation_service.infrastructure.redis import CacheService, get_redis_
 from recommendation_service.services.recommendation_engine_v2 import (
     HybridRecommendationEngine,
 )
+
+logger = structlog.get_logger()
 
 router = APIRouter()
 
@@ -203,6 +205,67 @@ async def get_frequently_bought_together(
     result = await engine.get_frequently_bought_together(
         product_id=product_id, limit=limit
     )
+
+    return RecommendationResponse(
+        recommendations=[
+            RecommendedProduct(**p) for p in result["recommendations"]
+        ],
+        request_id=result["request_id"],
+        context=result["context"],
+        user_id=result["user_id"],
+        generated_at=result["generated_at"],
+    )
+
+
+@router.get("/search", response_model=RecommendationResponse)
+async def get_search_recommendations(
+    query: Annotated[str, Query(description="Search query text", min_length=1, max_length=500)],
+    user_id: Annotated[
+        str | None, Query(description="Optional user ID for personalization")
+    ] = None,
+    limit: Annotated[int, Query(ge=1, le=50)] = 12,
+    category: Annotated[str | None, Query(description="Optional category filter")] = None,
+    session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+) -> RecommendationResponse:
+    """
+    Get search-based product recommendations.
+
+    Combines PostgreSQL full-text search (tsvector) with trigram fuzzy matching
+    and semantic embedding similarity for hybrid ranking.
+
+    **Algorithm:**
+    1. PG full-text search + trigram fuzzy matching for candidate retrieval
+    2. Blend text relevance (60%) with embedding cosine similarity (40%)
+    3. Optional Pinecone reranking for final scoring
+    4. Apply diversity and business rules
+
+    **Usage in UI:**
+    - Search results page
+    - "Search for Fridge" -> returns relevant fridge products ranked by relevance
+    """
+    engine = HybridRecommendationEngine(session)
+    result = await engine.get_search_recommendations(
+        query=query, user_id=user_id, limit=limit, category=category
+    )
+
+    # Track search interaction
+    if user_id:
+        try:
+            track_query = text("""
+                INSERT INTO recommender.user_interactions
+                (external_user_id, interaction_type, search_query,
+                 recommendation_request_id, created_at)
+                VALUES (:user_id, 'SEARCH', :search_query, :request_id, NOW())
+            """)
+            await session.execute(track_query, {
+                "user_id": user_id,
+                "search_query": query,
+                "request_id": result["request_id"],
+            })
+            await session.commit()
+        except Exception as e:
+            logger.warning("Failed to track search interaction", error=str(e))
 
     return RecommendationResponse(
         recommendations=[
