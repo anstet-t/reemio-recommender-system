@@ -16,6 +16,8 @@ ENDPOINTS = [
     ("/api/v1/recommendations/homepage", {"user_id": "user-001", "limit": "12"}),
     ("/api/v1/recommendations/product/prod-001", {"limit": "8"}),
     ("/api/v1/recommendations/frequently-bought-together/prod-001", {"limit": "4"}),
+    ("/api/v1/recommendations/search", {"query": "Notebook", "limit": "12"}),
+    ("/api/v1/recommendations/search", {"query": "Sugar", "user_id": "user-001", "limit": "8"}),
     ("/api/v1/health", {}),
 ]
 
