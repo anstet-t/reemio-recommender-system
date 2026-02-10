@@ -45,6 +45,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         debug=settings.debug,
     )
 
+    # Pre-warm the embedding model so first search isn't slow
+    from recommendation_service.services.embedding import get_embedding_model
+    logger.info("Pre-warming embedding model...")
+    get_embedding_model()
+    logger.info("Embedding model ready")
+
     yield
 
     await close_redis()
