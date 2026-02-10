@@ -705,40 +705,27 @@ class HybridRecommendationEngine:
         3. Optional Pinecone reranking
         4. Diversity + stock filtering business rules
         """
-        import asyncio
-
         from recommendation_service.services.search import SearchService
 
         request_id = str(uuid4())
         search_service = SearchService(self.session)
 
-        # Stage 1: PG text search + user prefs in parallel (they're independent)
-        async def _fetch_prefs():
-            if not user_id:
-                return None
-            prefs = await self._get_user_preference_data(user_id)
-            return prefs.get("top_categories")
+        # Get user preferences for personalization (cached, ~5ms with Redis)
+        user_categories = None
+        if user_id:
+            user_prefs = await self._get_user_preference_data(user_id)
+            user_categories = user_prefs.get("top_categories")
 
-        async def _fetch_candidates():
-            return await search_service.search_products(
-                query=query,
-                limit=limit * 3,
-                category=category,
-                user_categories=None,
-            )
-
-        user_categories, candidates = await asyncio.gather(
-            _fetch_prefs(), _fetch_candidates()
+        # Stage 1: PG full-text + trigram candidate retrieval
+        candidates = await search_service.search_products(
+            query=query,
+            limit=limit * 3,
+            category=category,
+            user_categories=user_categories,
         )
 
         if not candidates:
             return self._empty_response(request_id, "search", user_id)
-
-        # Apply category boost post-hoc if user has preferences
-        if user_categories:
-            for c in candidates:
-                if c.get("category") in user_categories:
-                    c["score"] = c.get("score", 0) * 1.2
 
         # Stage 2: Blend with embedding cosine similarity
         query_embedding = self.embedding_service.generate_embedding(query)
