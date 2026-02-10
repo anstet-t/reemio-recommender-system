@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from recommendation_service.config import Settings, get_settings
 from recommendation_service.infrastructure.database.connection import get_session
+from recommendation_service.infrastructure.redis import CacheService, get_redis_client
 from recommendation_service.services.recommendation_engine_v2 import (
     HybridRecommendationEngine,
 )
@@ -63,7 +64,9 @@ async def get_homepage_recommendations(
     - Homepage "Recommended for You" section
     - Personalized product carousel
     """
-    engine = HybridRecommendationEngine(session)
+    redis_client = await get_redis_client()
+    cache = CacheService(redis_client)
+    engine = HybridRecommendationEngine(session, cache=cache)
     result = await engine.get_homepage_recommendations(user_id=user_id, limit=limit)
 
     return RecommendationResponse(
@@ -101,7 +104,9 @@ async def get_similar_products(
     - Product page "Similar Products" section
     - "You might also like" carousel
     """
-    engine = HybridRecommendationEngine(session)
+    redis_client = await get_redis_client()
+    cache = CacheService(redis_client)
+    engine = HybridRecommendationEngine(session, cache=cache)
     result = await engine.get_similar_products(
         product_id=product_id, user_id=user_id, limit=limit
     )
@@ -148,7 +153,9 @@ async def get_cart_recommendations(
             detail="cart_product_ids must not be empty",
         )
 
-    engine = HybridRecommendationEngine(session)
+    redis_client = await get_redis_client()
+    cache = CacheService(redis_client)
+    engine = HybridRecommendationEngine(session, cache=cache)
     result = await engine.get_cart_recommendations(
         user_id=user_id, cart_product_ids=cart_product_ids, limit=limit
     )
@@ -190,7 +197,9 @@ async def get_frequently_bought_together(
     - Product page "Frequently Bought Together" section
     - Bundle suggestions
     """
-    engine = HybridRecommendationEngine(session)
+    redis_client = await get_redis_client()
+    cache = CacheService(redis_client)
+    engine = HybridRecommendationEngine(session, cache=cache)
     result = await engine.get_frequently_bought_together(
         product_id=product_id, limit=limit
     )

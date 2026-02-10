@@ -3,8 +3,9 @@
 Uses sentence-transformers to generate embeddings for products and user preferences.
 """
 
-import json
 from typing import Any
+
+import orjson
 
 import structlog
 from sqlalchemy import text
@@ -195,7 +196,7 @@ class EmbeddingService:
                         """)
                         await self.session.execute(
                             update_query,
-                            {"id": pid, "embedding": json.dumps(emb)},
+                            {"id": pid, "embedding": orjson.dumps(emb).decode()},
                         )
                         updated += 1
                     except Exception as e:
@@ -214,14 +215,13 @@ class EmbeddingService:
         return {"updated": updated, "errors": errors}
 
     def cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
-        """Calculate cosine similarity between two vectors."""
-        import math
+        """Calculate cosine similarity between two vectors using numpy."""
+        import numpy as np
 
-        dot_product = sum(a * b for a, b in zip(vec1, vec2))
-        norm1 = math.sqrt(sum(a * a for a in vec1))
-        norm2 = math.sqrt(sum(b * b for b in vec2))
-
-        if norm1 == 0 or norm2 == 0:
+        a = np.array(vec1, dtype=np.float32)
+        b = np.array(vec2, dtype=np.float32)
+        norm_a = np.linalg.norm(a)
+        norm_b = np.linalg.norm(b)
+        if norm_a == 0 or norm_b == 0:
             return 0.0
-
-        return dot_product / (norm1 * norm2)
+        return float(np.dot(a, b) / (norm_a * norm_b))

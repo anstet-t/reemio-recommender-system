@@ -3,11 +3,13 @@
 Builds user preference vectors from interaction history with weighted signals.
 """
 
-import json
+import math
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import numpy as np
+import orjson
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -92,7 +94,7 @@ class UserPreferenceService:
 
             # Parse embedding
             if isinstance(embedding, str):
-                embedding = json.loads(embedding)
+                embedding = orjson.loads(embedding)
 
             # Calculate weight with recency decay
             base_weight = self.INTERACTION_WEIGHTS.get(interaction_type, 1.0)
@@ -189,37 +191,30 @@ class UserPreferenceService:
 
     def _calculate_recency_weight(self, days_old: int) -> float:
         """Calculate recency decay weight."""
-        import math
-
         return math.exp(-days_old / self.RECENCY_DECAY_DAYS)
 
     def _aggregate_weighted_embeddings(
         self, weighted_embeddings: list[tuple[list[float], float]]
     ) -> list[float]:
-        """Aggregate multiple embeddings with weights."""
+        """Aggregate multiple embeddings with weights using numpy."""
         if not weighted_embeddings:
             return []
 
-        dim = len(weighted_embeddings[0][0])
-        aggregated = [0.0] * dim
-        total_weight = 0.0
-
-        for embedding, weight in weighted_embeddings:
-            for i, val in enumerate(embedding):
-                aggregated[i] += val * weight
-            total_weight += weight
+        embeddings = np.array([e for e, _ in weighted_embeddings], dtype=np.float32)
+        weights = np.array([w for _, w in weighted_embeddings], dtype=np.float32)
+        total_weight = weights.sum()
 
         if total_weight > 0:
-            aggregated = [v / total_weight for v in aggregated]
+            aggregated = (embeddings * weights[:, np.newaxis]).sum(axis=0) / total_weight
+        else:
+            aggregated = embeddings.mean(axis=0)
 
         # Normalize the vector
-        import math
-
-        norm = math.sqrt(sum(v * v for v in aggregated))
+        norm = np.linalg.norm(aggregated)
         if norm > 0:
-            aggregated = [v / norm for v in aggregated]
+            aggregated = aggregated / norm
 
-        return aggregated
+        return aggregated.tolist()
 
     async def _upsert_user_preference(
         self,
@@ -254,8 +249,8 @@ class UserPreferenceService:
             query,
             {
                 "user_id": user_id,
-                "embedding": json.dumps(embedding),
-                "top_categories": json.dumps(top_categories),
+                "embedding": orjson.dumps(embedding).decode(),
+                "top_categories": orjson.dumps(top_categories).decode(),
                 "avg_price_min": avg_price_min / 100 if avg_price_min else None,
                 "avg_price_max": avg_price_max / 100 if avg_price_max else None,
                 "interaction_count": interaction_count,

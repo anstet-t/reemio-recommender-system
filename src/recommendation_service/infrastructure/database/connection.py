@@ -4,18 +4,22 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import AsyncAdaptedQueuePool
 
 from recommendation_service.config import get_settings
 
 
 def get_async_engine():
-    """Create async database engine."""
+    """Create async database engine with connection pooling."""
     settings = get_settings()
     return create_async_engine(
         settings.database_url,
         echo=settings.debug,
-        poolclass=NullPool,  # Use NullPool for better compatibility with async
+        poolclass=AsyncAdaptedQueuePool,
+        pool_size=settings.db_pool_size,
+        max_overflow=settings.db_max_overflow,
+        pool_pre_ping=True,
+        pool_recycle=settings.db_pool_recycle,
     )
 
 
