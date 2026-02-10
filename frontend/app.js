@@ -26,7 +26,13 @@ const elements = {
     frequentlyBoughtSection: document.getElementById('frequentlyBoughtSection'),
     frequentlyBoughtProducts: document.getElementById('frequentlyBoughtProducts'),
     checkoutBtn: document.getElementById('checkoutBtn'),
-    toast: document.getElementById('toast')
+    toast: document.getElementById('toast'),
+    searchForm: document.getElementById('searchForm'),
+    searchInput: document.getElementById('searchInput'),
+    searchSection: document.getElementById('searchSection'),
+    searchProducts: document.getElementById('searchProducts'),
+    searchHeading: document.getElementById('searchHeading'),
+    closeSearch: document.getElementById('closeSearch')
 };
 
 function showToast(message) {
@@ -237,6 +243,32 @@ async function loadFrequentlyBoughtTogether(productId) {
     }
 }
 
+async function searchProducts(query) {
+    elements.searchSection.style.display = 'block';
+    elements.searchProducts.innerHTML = '<div class="loading">Searching...</div>';
+    elements.searchHeading.textContent = `Results for "${query}"`;
+
+    try {
+        const params = new URLSearchParams({ query, limit: '12', user_id: state.currentUser });
+        const response = await fetch(`${API_BASE_URL}/recommendations/search?${params}`);
+        const data = await response.json();
+
+        if (data.recommendations.length === 0) {
+            elements.searchProducts.innerHTML = '<div class="loading">No products found. Try a different search.</div>';
+            return;
+        }
+
+        elements.searchProducts.innerHTML = data.recommendations
+            .map(product => renderProduct(product, true))
+            .join('');
+
+        elements.searchSection.scrollIntoView({ behavior: 'smooth' });
+    } catch (error) {
+        console.error('Error searching products:', error);
+        elements.searchProducts.innerHTML = '<div class="loading">Error searching products. Make sure the API is running.</div>';
+    }
+}
+
 async function trackInteraction(productId, interactionType) {
     try {
         await fetch(`${API_BASE_URL}/interactions`, {
@@ -279,6 +311,16 @@ elements.refreshHomepage.addEventListener('click', loadHomepageRecommendations);
 elements.closeSimilar.addEventListener('click', () => {
     elements.similarSection.style.display = 'none';
     elements.frequentlyBoughtSection.style.display = 'none';
+});
+
+elements.searchForm.addEventListener('submit', () => {
+    const query = elements.searchInput.value.trim();
+    if (query) searchProducts(query);
+});
+
+elements.closeSearch.addEventListener('click', () => {
+    elements.searchSection.style.display = 'none';
+    elements.searchInput.value = '';
 });
 
 elements.checkoutBtn.addEventListener('click', () => {
