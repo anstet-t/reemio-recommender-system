@@ -22,11 +22,15 @@ _embedding_model = None
 def get_embedding_model():
     """Get or initialize the embedding model."""
     global _embedding_model
+
+    settings = get_settings()
+    if settings.disable_local_embeddings:
+        return None
+
     if _embedding_model is None:
         try:
             from sentence_transformers import SentenceTransformer
 
-            settings = get_settings()
             model_name = settings.embedding_model
             logger.info("Loading embedding model", model=model_name)
             _embedding_model = SentenceTransformer(model_name)

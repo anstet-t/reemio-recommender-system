@@ -23,3 +23,5 @@ services:
         value: "*"
       - key: PINECONE_API_KEY
         sync: false
+      - key: DISABLE_LOCAL_EMBEDDINGS
+        value: "true"

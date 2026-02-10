@@ -34,6 +34,10 @@ class EmbeddingService:
     def model(self) -> Any:
         """Lazy load the sentence-transformers model."""
         if self._model is None:
+            if self.settings.disable_local_embeddings:
+                logger.info("Local embeddings disabled, using mock embeddings")
+                self._model = MockEmbeddingModel(self.settings.embedding_dimension)
+                return self._model
             try:
                 from sentence_transformers import SentenceTransformer
 

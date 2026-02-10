@@ -62,6 +62,7 @@ class Settings(BaseSettings):
 
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     embedding_dimension: int = 384
+    disable_local_embeddings: bool = False
 
     redis_host: str = "localhost"
     redis_port: int = 6379
