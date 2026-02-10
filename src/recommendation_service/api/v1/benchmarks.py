@@ -53,12 +53,12 @@ async def get_benchmark_profile(
     # Database pool stats
     engine = session.get_bind()
     pool = engine.pool
-    db_pool_stats = {
-        "pool_size": getattr(pool, "size", "N/A"),
-        "checked_in": pool.checkedin() if hasattr(pool, "checkedin") else "N/A",
-        "checked_out": pool.checkedout() if hasattr(pool, "checkedout") else "N/A",
-        "overflow": pool.overflow() if hasattr(pool, "overflow") else "N/A",
-    }
+    db_pool_stats = {}
+    pool_size = getattr(pool, "size", None)
+    db_pool_stats["pool_size"] = pool_size() if callable(pool_size) else (pool_size or "N/A")
+    for attr in ("checkedin", "checkedout", "overflow"):
+        val = getattr(pool, attr, None)
+        db_pool_stats[attr] = val() if callable(val) else "N/A"
 
     # Cache status
     redis_client = await get_redis_client()
