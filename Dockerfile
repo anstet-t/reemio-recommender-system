@@ -11,7 +11,6 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:$PATH"
 
 COPY pyproject.toml uv.lock ./
-ENV PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu
 RUN uv sync --frozen --no-dev --no-install-project
 
 FROM python:3.11-slim AS production
