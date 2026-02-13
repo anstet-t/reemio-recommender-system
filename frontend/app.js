@@ -167,24 +167,28 @@ async function loadSimilarProducts(productId) {
     elements.similarSection.style.display = 'block';
     elements.similarProducts.innerHTML = '<div class="loading">Loading similar products...</div>';
 
+    // Find the source product from already-loaded homepage data (no extra API call)
+    const existingProducts = elements.homepageProducts.querySelectorAll('.product-card');
+    const sourceBtn = document.querySelector(`button[onclick*="loadSimilarProducts('${productId}')"]`);
+    const sourceCard = sourceBtn ? sourceBtn.closest('.product-card') : null;
+
+    if (sourceCard) {
+        const category = sourceCard.querySelector('.product-category')?.textContent || '';
+        const name = sourceCard.querySelector('.product-name')?.textContent || '';
+        const price = sourceCard.querySelector('.product-price')?.textContent || '';
+        elements.selectedProduct.innerHTML = `
+            <div class="selected-product-image">${getProductEmoji(category)}</div>
+            <div class="selected-product-info">
+                <div class="product-category">${category}</div>
+                <h3>${name}</h3>
+                <div class="product-price">${price}</div>
+            </div>
+        `;
+    }
+
     try {
         const response = await fetch(`${API_BASE_URL}/recommendations/product/${productId}?user_id=${state.currentUser}&limit=8`);
         const data = await response.json();
-
-        const productResponse = await fetch(`${API_BASE_URL}/recommendations/homepage?user_id=${state.currentUser}&limit=50`);
-        const productData = await productResponse.json();
-        const sourceProduct = productData.recommendations ? productData.recommendations.find(p => p.product_id === productId) : null;
-
-        if (sourceProduct) {
-            elements.selectedProduct.innerHTML = `
-                <div class="selected-product-image">${getProductEmoji(sourceProduct.category)}</div>
-                <div class="selected-product-info">
-                    <div class="product-category">${sourceProduct.category}</div>
-                    <h3>${sourceProduct.name}</h3>
-                    <div class="product-price">KES ${sourceProduct.price.toLocaleString()}</div>
-                </div>
-            `;
-        }
 
         elements.similarProducts.innerHTML = data.recommendations
             .map(product => renderProduct(product))

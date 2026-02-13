@@ -1,5 +1,6 @@
 """Hybrid recommendation engine with 4-stage pipeline."""
 
+import asyncio
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any
@@ -52,15 +53,24 @@ class HybridRecommendationEngine:
             user_embedding = await self._get_user_embedding(user_id)
             if user_embedding:
                 has_user_data = True
-                content_candidates = await self._search_similar_products(
+                # Run content + collaborative search in parallel
+                content_task = self._search_similar_products(
                     user_embedding, limit=limit * 3, exclude_ids=[]
                 )
+                collab_task = self._get_collaborative_candidates(user_id, limit=limit * 2)
+                content_candidates, collab_candidates = await asyncio.gather(
+                    content_task, collab_task
+                )
                 candidates.extend(content_candidates)
-
-            collab_candidates = await self._get_collaborative_candidates(user_id, limit=limit * 2)
-            if collab_candidates:
-                has_user_data = True
-                candidates.extend(collab_candidates)
+                if collab_candidates:
+                    candidates.extend(collab_candidates)
+            else:
+                collab_candidates = await self._get_collaborative_candidates(
+                    user_id, limit=limit * 2
+                )
+                if collab_candidates:
+                    has_user_data = True
+                    candidates.extend(collab_candidates)
 
         if not candidates:
             candidates = await self._get_popular_products(limit=limit * 2)
@@ -112,16 +122,19 @@ class HybridRecommendationEngine:
         candidates = []
         source_embedding = source_product.get("embedding")
 
+        # Run similarity search and co-purchase query in parallel
         if source_embedding:
-            candidates = await self._search_similar_products(
+            similar_task = self._search_similar_products(
                 source_embedding, limit=limit * 4, exclude_ids=[product_id]
             )
         else:
-            candidates = await self._get_products_by_category(
+            similar_task = self._get_products_by_category(
                 source_product.get("category"), limit=limit * 2, exclude_ids=[product_id]
             )
 
-        co_purchased = await self._get_co_purchased_products(product_id, limit=limit)
+        co_purchase_task = self._get_co_purchased_products(product_id, limit=limit)
+        candidates, co_purchased = await asyncio.gather(similar_task, co_purchase_task)
+        candidates = list(candidates)
         candidates.extend(co_purchased)
 
         candidates = self._deduplicate_candidates(candidates, exclude_ids=[product_id])
