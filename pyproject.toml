@@ -1,9 +1,7 @@
-[tool.uv]
-index-strategy = "first-index"
-
 [[tool.uv.index]]
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [tool.uv.sources]
 torch = { index = "pytorch-cpu" }
@@ -69,6 +67,8 @@ dependencies = [
     "psutil>=5.9.0",
     "sentence-transformers>=5.2.2",
     "pinecone>=5.0.0",
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
 ]
 
 [project.optional-dependencies]
