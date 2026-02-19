@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #667eea;
+  --color-secondary: #764ba2;
+  --color-text-primary: #1a202c;
+  --color-text-secondary: #718096;
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f7fafc;
+  --color-border: #e2e8f0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  color: var(--color-text-primary);
+  background: var(--color-bg-secondary);
+  line-height: 1.6;
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-bg {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+}

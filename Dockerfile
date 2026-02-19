@@ -1,3 +1,11 @@
+FROM node:20-slim AS frontend-builder
+
+WORKDIR /frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
 FROM python:3.11-slim AS builder
 
 WORKDIR /app
@@ -26,7 +34,7 @@ COPY --from=builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
 COPY src/ ./src/
-COPY frontend/ ./frontend/
+COPY --from=frontend-builder /frontend/dist ./frontend/dist/
 COPY alembic.ini ./
 
 ENV PYTHONUNBUFFERED=1 \

@@ -15,7 +15,7 @@ from recommendation_service.config import get_settings
 from recommendation_service.infrastructure.redis import close_redis
 from recommendation_service.middleware.timing import TimingMiddleware
 
-FRONTEND_DIR = Path(__file__).parent.parent.parent / "frontend"
+FRONTEND_DIST_DIR = Path(__file__).parent.parent.parent / "frontend" / "dist"
 
 structlog.configure(
     processors=[
@@ -85,16 +85,16 @@ def create_app() -> FastAPI:
 
     app.include_router(api_router, prefix="/api/v1")
 
-    if FRONTEND_DIR.exists():
-        app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+    if FRONTEND_DIST_DIR.exists():
+        app.mount("/assets", StaticFiles(directory=FRONTEND_DIST_DIR / "assets"), name="assets")
 
-        @app.get("/")
-        async def serve_frontend():
-            return FileResponse(FRONTEND_DIR / "index.html")
-
-        @app.get("/app")
-        async def serve_app():
-            return FileResponse(FRONTEND_DIR / "index.html")
+        @app.get("/{path:path}")
+        async def serve_frontend(path: str):
+            """Serve React app — static files if they exist, otherwise index.html for client-side routing."""
+            file = FRONTEND_DIST_DIR / path
+            if path and file.exists() and file.is_file():
+                return FileResponse(file)
+            return FileResponse(FRONTEND_DIST_DIR / "index.html")
 
     return app
 
