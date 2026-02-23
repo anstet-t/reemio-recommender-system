@@ -5,6 +5,7 @@ import { ToastProvider } from "@/context/ToastContext";
 import Navbar from "@/components/Navbar";
 import Toast from "@/components/Toast";
 import HomePage from "@/pages/HomePage";
+import ProductPage from "@/pages/ProductPage";
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
             <Navbar />
             <Routes>
               <Route path="/" element={<HomePage />} />
+              <Route path="/product/:id" element={<ProductPage />} />
             </Routes>
             <Toast />
           </ToastProvider>

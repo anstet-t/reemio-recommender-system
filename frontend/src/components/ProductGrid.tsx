@@ -8,9 +8,9 @@ interface ProductGridProps {
   loadingText?: string;
   emptyText?: string;
   showSimilarBtn?: boolean;
-  onViewProduct?: (productId: string) => void;
+  onViewProduct?: (product: Product) => void;
   onAddToCart?: (product: Product) => void;
-  onViewSimilar?: (productId: string) => void;
+  onViewSimilar?: (product: Product) => void;
 }
 
 export default function ProductGrid({

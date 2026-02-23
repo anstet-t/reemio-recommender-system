@@ -1,12 +1,11 @@
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/context/ToastContext";
 import {
   fetchHomepage,
-  fetchSimilarProducts,
   fetchCartRecommendations,
-  fetchFrequentlyBoughtTogether,
   searchProducts as searchProductsApi,
   trackInteraction,
 } from "@/api/client";
@@ -14,11 +13,13 @@ import type { Product } from "@/types";
 import Hero from "@/components/Hero";
 import SectionHeader from "@/components/SectionHeader";
 import ProductGrid from "@/components/ProductGrid";
+import { saveProduct } from "@/utils/productCache";
 
 export default function HomePage() {
   const { currentUser } = useUser();
   const { items: cartItems, addToCart } = useCart();
   const { showToast } = useToast();
+  const navigate = useNavigate();
 
   // Homepage recommendations
   const [homepage, setHomepage] = useState<Product[]>([]);
@@ -31,23 +32,11 @@ export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchVisible, setSearchVisible] = useState(false);
 
-  // Similar products
-  const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
-  const [similarLoading, setSimilarLoading] = useState(false);
-  const [similarVisible, setSimilarVisible] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-
-  // Frequently bought together
-  const [fbtProducts, setFbtProducts] = useState<Product[]>([]);
-  const [fbtLoading, setFbtLoading] = useState(false);
-  const [fbtVisible, setFbtVisible] = useState(false);
-
   // Cart recommendations
   const [cartRecs, setCartRecs] = useState<Product[]>([]);
   const [cartRecsLoading, setCartRecsLoading] = useState(false);
   const [cartRecsVisible, setCartRecsVisible] = useState(false);
 
-  const similarRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
 
   // Load homepage
@@ -95,44 +84,12 @@ export default function HomePage() {
     [addToCart, showToast, currentUser.id]
   );
 
-  const handleViewProduct = useCallback(
-    async (productId: string) => {
-      // Find product from current data for display
-      const allProducts = [...homepage, ...searchResults];
-      const source = allProducts.find((p) => p.product_id === productId);
-      if (source) setSelectedProduct(source);
-
-      // Load similar products
-      setSimilarVisible(true);
-      setSimilarLoading(true);
-      try {
-        const data = await fetchSimilarProducts(productId, currentUser.id);
-        setSimilarProducts(data.recommendations);
-        trackInteraction(currentUser.id, productId, "view");
-      } catch {
-        setSimilarProducts([]);
-      } finally {
-        setSimilarLoading(false);
-      }
-
-      // Load frequently bought together
-      setFbtVisible(true);
-      setFbtLoading(true);
-      try {
-        const data = await fetchFrequentlyBoughtTogether(productId);
-        setFbtProducts(data.recommendations);
-      } catch {
-        setFbtProducts([]);
-      } finally {
-        setFbtLoading(false);
-      }
-
-      setTimeout(
-        () => similarRef.current?.scrollIntoView({ behavior: "smooth" }),
-        100
-      );
+  const handleOpenProduct = useCallback(
+    (product: Product) => {
+      saveProduct(product);
+      navigate(`/product/${product.product_id}`, { state: { product } });
     },
-    [currentUser.id, homepage, searchResults]
+    [navigate]
   );
 
   const handleSearch = useCallback(
@@ -156,19 +113,6 @@ export default function HomePage() {
     [currentUser.id]
   );
 
-  const CATEGORY_EMOJI: Record<string, string> = {
-    Electronics: "\u{1F4F1}",
-    Clothing: "\u{1F455}",
-    Home: "\u{1F3E0}",
-    Sports: "\u26BD",
-    Books: "\u{1F4DA}",
-    Beauty: "\u{1F484}",
-    Toys: "\u{1F9F8}",
-    Food: "\u{1F354}",
-    Furniture: "\u{1FA91}",
-    Garden: "\u{1F331}",
-  };
-
   return (
     <main className="max-w-[1400px] mx-auto p-8 max-sm:p-4">
       <Hero onSearch={handleSearch} />
@@ -190,9 +134,9 @@ export default function HomePage() {
             loadingText="Searching..."
             emptyText="No products found. Try a different search."
             showSimilarBtn
-            onViewProduct={handleViewProduct}
+            onViewProduct={handleOpenProduct}
             onAddToCart={handleAddToCart}
-            onViewSimilar={handleViewProduct}
+            onViewSimilar={handleOpenProduct}
           />
         </section>
       )}
@@ -222,55 +166,11 @@ export default function HomePage() {
           error={homepageError}
           loadingText="Loading popular products..."
           showSimilarBtn
-          onViewProduct={handleViewProduct}
+          onViewProduct={handleOpenProduct}
           onAddToCart={handleAddToCart}
-          onViewSimilar={handleViewProduct}
+          onViewSimilar={handleOpenProduct}
         />
       </section>
-
-      {/* Similar Products */}
-      {similarVisible && (
-        <section ref={similarRef} className="mb-12">
-          <SectionHeader title="Similar Products">
-            <button
-              className="text-2xl px-3 py-1 bg-white border border-border rounded-lg hover:bg-red-500 hover:text-white hover:border-transparent transition-all duration-300"
-              onClick={() => {
-                setSimilarVisible(false);
-                setFbtVisible(false);
-              }}
-            >
-              &times;
-            </button>
-          </SectionHeader>
-
-          {selectedProduct && (
-            <div className="bg-white rounded-xl p-6 mb-6 shadow-md flex items-center gap-6">
-              <div className="w-[120px] h-[120px] rounded-lg bg-gradient-to-br from-gray-100 to-gray-300 flex items-center justify-center text-5xl shrink-0">
-                {CATEGORY_EMOJI[selectedProduct.category] ?? "\u{1F4E6}"}
-              </div>
-              <div>
-                <div className="text-primary text-xs font-semibold uppercase tracking-wide mb-1">
-                  {selectedProduct.category}
-                </div>
-                <h3 className="text-2xl font-bold mb-2">
-                  {selectedProduct.name}
-                </h3>
-                <div className="text-xl font-bold gradient-text">
-                  KES {selectedProduct.price.toLocaleString()}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <ProductGrid
-            products={similarProducts}
-            loading={similarLoading}
-            loadingText="Loading similar products..."
-            onViewProduct={handleViewProduct}
-            onAddToCart={handleAddToCart}
-          />
-        </section>
-      )}
 
       {/* Cart Recommendations */}
       {cartRecsVisible && (
@@ -280,21 +180,7 @@ export default function HomePage() {
             products={cartRecs}
             loading={cartRecsLoading}
             loadingText="Loading recommendations..."
-            onViewProduct={handleViewProduct}
-            onAddToCart={handleAddToCart}
-          />
-        </section>
-      )}
-
-      {/* Frequently Bought Together */}
-      {fbtVisible && (
-        <section className="mb-12">
-          <SectionHeader title="Frequently Bought Together" />
-          <ProductGrid
-            products={fbtProducts}
-            loading={fbtLoading}
-            loadingText="Loading..."
-            onViewProduct={handleViewProduct}
+            onViewProduct={handleOpenProduct}
             onAddToCart={handleAddToCart}
           />
         </section>
