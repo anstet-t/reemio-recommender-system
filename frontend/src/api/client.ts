@@ -1,4 +1,5 @@
 import type { RecommendationResponse } from "@/types";
+import { getSessionId } from "@/utils/sessionId";
 
 const API_BASE = "/api/v1";
 
@@ -64,19 +65,38 @@ export async function searchProducts(
   return res.json();
 }
 
+export type InteractionType =
+  | "view"
+  | "cart_add"
+  | "cart_remove"
+  | "purchase"
+  | "wishlist_add"
+  | "search"
+  | "recommendation_click"
+  | "recommendation_view";
+
+export interface TrackInteractionPayload {
+  user_id: string;
+  product_id?: string;
+  interaction_type: InteractionType;
+  search_query?: string;
+  recommendation_context?: string;
+  recommendation_position?: number;
+  session_id?: string;
+  metadata?: Record<string, unknown>;
+}
+
 export async function trackInteraction(
-  userId: string,
-  productId: string,
-  interactionType: string
+  payload: TrackInteractionPayload
 ): Promise<void> {
   try {
+    const sessionId = payload.session_id ?? getSessionId();
     await fetch(`${API_BASE}/interactions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        user_id: userId,
-        product_id: productId,
-        interaction_type: interactionType,
+        ...payload,
+        session_id: sessionId,
       }),
     });
   } catch {

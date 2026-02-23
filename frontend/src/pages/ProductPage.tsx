@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import { useCart } from "@/context/CartContext";
@@ -39,12 +39,32 @@ export default function ProductPage() {
   const [fbtProducts, setFbtProducts] = useState<Product[]>([]);
   const [fbtLoading, setFbtLoading] = useState(false);
 
+  const locationState = useMemo(
+    () =>
+      (location.state as
+        | { product?: Product; recContext?: string; recPosition?: number }
+        | null) ?? null,
+    [location.state]
+  );
+
   const product = useMemo(() => {
-    const fromState = (location.state as { product?: Product } | null)?.product;
+    const fromState = locationState?.product;
     if (fromState) return fromState;
     if (productId) return getProduct(productId);
     return null;
-  }, [location.state, productId]);
+  }, [locationState, productId]);
+
+  const viewSentRef = useRef(false);
+  const dwellSentRef = useRef(false);
+  const startTimeRef = useRef<number | null>(null);
+  const accumulatedRef = useRef(0);
+
+  useEffect(() => {
+    viewSentRef.current = false;
+    dwellSentRef.current = false;
+    startTimeRef.current = null;
+    accumulatedRef.current = 0;
+  }, [productId]);
 
   useEffect(() => {
     if (product) saveProduct(product);
@@ -52,14 +72,34 @@ export default function ProductPage() {
 
   useEffect(() => {
     if (!productId) return;
-    trackInteraction(currentUser.id, productId, "view");
-  }, [currentUser.id, productId]);
+    trackInteraction({
+      user_id: currentUser.id,
+      product_id: productId,
+      interaction_type: "view",
+      metadata: {
+        sourceContext: locationState?.recContext,
+        sourcePosition: locationState?.recPosition,
+      },
+    });
+    viewSentRef.current = true;
+  }, [currentUser.id, locationState?.recContext, locationState?.recPosition, productId]);
 
   useEffect(() => {
     if (!productId) return;
     setSimilarLoading(true);
     fetchSimilarProducts(productId, currentUser.id)
-      .then((data) => setSimilarProducts(data.recommendations))
+      .then((data) => {
+        setSimilarProducts(data.recommendations);
+        data.recommendations.forEach((item, index) => {
+          trackInteraction({
+            user_id: currentUser.id,
+            product_id: item.product_id,
+            interaction_type: "recommendation_view",
+            recommendation_context: "product",
+            recommendation_position: index + 1,
+          });
+        });
+      })
       .catch(() => setSimilarProducts([]))
       .finally(() => setSimilarLoading(false));
   }, [currentUser.id, productId]);
@@ -68,7 +108,18 @@ export default function ProductPage() {
     if (!productId) return;
     setFbtLoading(true);
     fetchFrequentlyBoughtTogether(productId)
-      .then((data) => setFbtProducts(data.recommendations))
+      .then((data) => {
+        setFbtProducts(data.recommendations);
+        data.recommendations.forEach((item, index) => {
+          trackInteraction({
+            user_id: currentUser.id,
+            product_id: item.product_id,
+            interaction_type: "recommendation_view",
+            recommendation_context: "product",
+            recommendation_position: index + 1,
+          });
+        });
+      })
       .catch(() => setFbtProducts([]))
       .finally(() => setFbtLoading(false));
   }, [productId]);
@@ -78,19 +129,86 @@ export default function ProductPage() {
       const added = addToCart(item);
       showToast(added ? "Added to cart!" : "Item already in cart");
       if (added) {
-        trackInteraction(currentUser.id, item.product_id, "cart_add");
+        trackInteraction({
+          user_id: currentUser.id,
+          product_id: item.product_id,
+          interaction_type: "cart_add",
+        });
       }
     },
     [addToCart, showToast, currentUser.id]
   );
 
   const handleOpenProduct = useCallback(
-    (item: Product) => {
+    (item: Product, position?: number, context?: string) => {
       saveProduct(item);
-      navigate(`/product/${item.product_id}`, { state: { product: item } });
+      if (context) {
+        trackInteraction({
+          user_id: currentUser.id,
+          product_id: item.product_id,
+          interaction_type: "recommendation_click",
+          recommendation_context: context,
+          recommendation_position: position,
+        });
+      }
+      navigate(`/product/${item.product_id}`, {
+        state: { product: item, recContext: context, recPosition: position },
+      });
     },
-    [navigate]
+    [currentUser.id, navigate]
   );
+
+  useEffect(() => {
+    if (!productId || !product) return;
+    startTimeRef.current = Date.now();
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        const now = Date.now();
+        if (startTimeRef.current) {
+          accumulatedRef.current +=
+            (now - startTimeRef.current) / 1000;
+          startTimeRef.current = null;
+        }
+        if (
+          viewSentRef.current &&
+          !dwellSentRef.current &&
+          accumulatedRef.current >= 2
+        ) {
+          trackInteraction({
+            user_id: currentUser.id,
+            product_id: productId,
+            interaction_type: "view",
+            metadata: { timeOnPageSeconds: Math.round(accumulatedRef.current) },
+          });
+          dwellSentRef.current = true;
+        }
+      } else if (document.visibilityState === "visible") {
+        if (!startTimeRef.current) startTimeRef.current = Date.now();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      const now = Date.now();
+      if (startTimeRef.current) {
+        accumulatedRef.current += (now - startTimeRef.current) / 1000;
+        startTimeRef.current = null;
+      }
+      if (
+        viewSentRef.current &&
+        !dwellSentRef.current &&
+        accumulatedRef.current >= 2
+      ) {
+        trackInteraction({
+          user_id: currentUser.id,
+          product_id: productId,
+          interaction_type: "view",
+          metadata: { timeOnPageSeconds: Math.round(accumulatedRef.current) },
+        });
+        dwellSentRef.current = true;
+      }
+    };
+  }, [currentUser.id, product, productId]);
 
   if (!productId || !product) {
     return (
@@ -165,6 +283,7 @@ export default function ProductPage() {
           products={similarProducts}
           loading={similarLoading}
           loadingText="Loading similar products..."
+          recommendationContext="product"
           onViewProduct={handleOpenProduct}
           onAddToCart={handleAddToCart}
         />
@@ -176,6 +295,7 @@ export default function ProductPage() {
           products={fbtProducts}
           loading={fbtLoading}
           loadingText="Loading..."
+          recommendationContext="product"
           onViewProduct={handleOpenProduct}
           onAddToCart={handleAddToCart}
         />

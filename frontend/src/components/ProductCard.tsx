@@ -19,9 +19,9 @@ function getEmoji(category: string) {
 
 interface ProductCardProps {
   product: Product;
-  onViewProduct?: (product: Product) => void;
+  onViewProduct?: (product: Product, position?: number, context?: string) => void;
   onAddToCart?: (product: Product) => void;
-  onViewSimilar?: (product: Product) => void;
+  onViewSimilar?: (product: Product, position?: number, context?: string) => void;
   showSimilarBtn?: boolean;
 }
 

@@ -269,7 +269,7 @@ class RecommendationEvaluator:
             SELECT external_user_id, external_product_id
             FROM recommender.user_interactions
             WHERE created_at >= :cutoff
-            AND interaction_type IN ('PURCHASE', 'CART_ADD', 'VIEW')
+            AND lower(interaction_type::text) IN ('purchase', 'cart_add', 'view')
         """)
         result = await self.session.execute(query, {"cutoff": cutoff_date})
         rows = result.fetchall()

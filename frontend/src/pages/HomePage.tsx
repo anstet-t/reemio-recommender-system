@@ -46,6 +46,15 @@ export default function HomePage() {
     try {
       const data = await fetchHomepage(currentUser.id);
       setHomepage(data.recommendations);
+      data.recommendations.forEach((product, index) => {
+        trackInteraction({
+          user_id: currentUser.id,
+          product_id: product.product_id,
+          interaction_type: "recommendation_view",
+          recommendation_context: "homepage",
+          recommendation_position: index + 1,
+        });
+      });
     } catch {
       setHomepageError("Error loading products. Make sure the API is running.");
     } finally {
@@ -68,7 +77,18 @@ export default function HomePage() {
     setCartRecsLoading(true);
     const ids = cartItems.map((item) => item.product_id);
     fetchCartRecommendations(currentUser.id, ids)
-      .then((data) => setCartRecs(data.recommendations))
+      .then((data) => {
+        setCartRecs(data.recommendations);
+        data.recommendations.forEach((product, index) => {
+          trackInteraction({
+            user_id: currentUser.id,
+            product_id: product.product_id,
+            interaction_type: "recommendation_view",
+            recommendation_context: "cart",
+            recommendation_position: index + 1,
+          });
+        });
+      })
       .catch(() => setCartRecs([]))
       .finally(() => setCartRecsLoading(false));
   }, [cartItems, currentUser.id]);
@@ -78,18 +98,33 @@ export default function HomePage() {
       const added = addToCart(product);
       showToast(added ? "Added to cart!" : "Item already in cart");
       if (added) {
-        trackInteraction(currentUser.id, product.product_id, "cart_add");
+        trackInteraction({
+          user_id: currentUser.id,
+          product_id: product.product_id,
+          interaction_type: "cart_add",
+        });
       }
     },
     [addToCart, showToast, currentUser.id]
   );
 
   const handleOpenProduct = useCallback(
-    (product: Product) => {
+    (product: Product, position?: number, context?: string) => {
       saveProduct(product);
-      navigate(`/product/${product.product_id}`, { state: { product } });
+      if (context) {
+        trackInteraction({
+          user_id: currentUser.id,
+          product_id: product.product_id,
+          interaction_type: "recommendation_click",
+          recommendation_context: context,
+          recommendation_position: position,
+        });
+      }
+      navigate(`/product/${product.product_id}`, {
+        state: { product, recContext: context, recPosition: position },
+      });
     },
-    [navigate]
+    [currentUser.id, navigate]
   );
 
   const handleSearch = useCallback(
@@ -97,9 +132,24 @@ export default function HomePage() {
       setSearchQuery(query);
       setSearchVisible(true);
       setSearchLoading(true);
+      trackInteraction({
+        user_id: currentUser.id,
+        interaction_type: "search",
+        search_query: query,
+      });
       try {
         const data = await searchProductsApi(query, currentUser.id);
         setSearchResults(data.recommendations);
+        data.recommendations.forEach((product, index) => {
+          trackInteraction({
+            user_id: currentUser.id,
+            product_id: product.product_id,
+            interaction_type: "recommendation_view",
+            recommendation_context: "search",
+            recommendation_position: index + 1,
+            metadata: { resultsCount: data.recommendations.length },
+          });
+        });
       } catch {
         setSearchResults([]);
       } finally {
@@ -134,6 +184,7 @@ export default function HomePage() {
             loadingText="Searching..."
             emptyText="No products found. Try a different search."
             showSimilarBtn
+            recommendationContext="search"
             onViewProduct={handleOpenProduct}
             onAddToCart={handleAddToCart}
             onViewSimilar={handleOpenProduct}
@@ -166,6 +217,7 @@ export default function HomePage() {
           error={homepageError}
           loadingText="Loading popular products..."
           showSimilarBtn
+          recommendationContext="homepage"
           onViewProduct={handleOpenProduct}
           onAddToCart={handleAddToCart}
           onViewSimilar={handleOpenProduct}
@@ -180,6 +232,7 @@ export default function HomePage() {
             products={cartRecs}
             loading={cartRecsLoading}
             loadingText="Loading recommendations..."
+            recommendationContext="cart"
             onViewProduct={handleOpenProduct}
             onAddToCart={handleAddToCart}
           />

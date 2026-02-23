@@ -97,7 +97,16 @@ class UserPreferenceService:
                 embedding = orjson.loads(embedding)
 
             # Calculate weight with recency decay
-            base_weight = self.INTERACTION_WEIGHTS.get(interaction_type, 1.0)
+            if hasattr(interaction_type, "value"):
+                interaction_key = str(interaction_type.value)
+            elif hasattr(interaction_type, "name"):
+                interaction_key = str(interaction_type.name)
+            else:
+                interaction_key = str(interaction_type)
+            base_weight = self.INTERACTION_WEIGHTS.get(
+                interaction_key,
+                self.INTERACTION_WEIGHTS.get(interaction_key.upper(), 1.0),
+            )
             days_old = (now - created_at).days
             recency_factor = self._calculate_recency_weight(days_old)
             final_weight = base_weight * recency_factor

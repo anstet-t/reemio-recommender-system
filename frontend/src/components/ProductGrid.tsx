@@ -8,9 +8,10 @@ interface ProductGridProps {
   loadingText?: string;
   emptyText?: string;
   showSimilarBtn?: boolean;
-  onViewProduct?: (product: Product) => void;
+  recommendationContext?: string;
+  onViewProduct?: (product: Product, position?: number, context?: string) => void;
   onAddToCart?: (product: Product) => void;
-  onViewSimilar?: (product: Product) => void;
+  onViewSimilar?: (product: Product, position?: number, context?: string) => void;
 }
 
 export default function ProductGrid({
@@ -20,6 +21,7 @@ export default function ProductGrid({
   loadingText = "Loading...",
   emptyText = "No products available",
   showSimilarBtn = false,
+  recommendationContext,
   onViewProduct,
   onAddToCart,
   onViewSimilar,
@@ -48,14 +50,18 @@ export default function ProductGrid({
 
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-6">
-      {products.map((product) => (
+      {products.map((product, index) => (
         <ProductCard
           key={product.product_id}
           product={product}
           showSimilarBtn={showSimilarBtn}
-          onViewProduct={onViewProduct}
+          onViewProduct={(item) =>
+            onViewProduct?.(item, index + 1, recommendationContext)
+          }
           onAddToCart={onAddToCart}
-          onViewSimilar={onViewSimilar}
+          onViewSimilar={(item) =>
+            onViewSimilar?.(item, index + 1, recommendationContext)
+          }
         />
       ))}
     </div>

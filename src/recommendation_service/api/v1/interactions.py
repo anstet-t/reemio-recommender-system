@@ -4,8 +4,15 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from recommendation_service.infrastructure.database.connection import get_session
+from recommendation_service.infrastructure.redis import CacheService, get_redis_client
+from recommendation_service.services.user_preference import UserPreferenceService
 
 router = APIRouter()
 
@@ -80,7 +87,10 @@ class BatchInteractionResponse(BaseModel):
 
 
 @router.post("", response_model=InteractionResponse)
-async def track_interaction(interaction: InteractionRequest) -> InteractionResponse:
+async def track_interaction(
+    interaction: InteractionRequest,
+    session: AsyncSession = Depends(get_session),
+) -> InteractionResponse:
     """
     Track a single user interaction.
 
@@ -128,15 +138,55 @@ async def track_interaction(interaction: InteractionRequest) -> InteractionRespo
             detail="search_query is required for search interactions",
         )
 
-    # TODO: Implement actual interaction recording
-    # 1. Validate user exists
-    # 2. Validate product exists (if applicable)
-    # 3. Insert into user_interactions table
-    # 4. Publish event for async processing (user preference update)
+    insert_query = text("""
+        INSERT INTO recommender.user_interactions
+        (
+            external_user_id,
+            external_product_id,
+            interaction_type,
+            search_query,
+            recommendation_context,
+            recommendation_position,
+            session_id,
+            extra_data
+        )
+        VALUES
+        (
+            :user_id,
+            :product_id,
+            :interaction_type,
+            :search_query,
+            :recommendation_context,
+            :recommendation_position,
+            :session_id,
+            :extra_data
+        )
+        RETURNING id
+    """).bindparams(bindparam("extra_data", type_=JSONB))
 
-    from uuid import uuid4
+    result = await session.execute(
+        insert_query,
+        {
+            "user_id": interaction.user_id,
+            "product_id": interaction.product_id,
+            "interaction_type": interaction.interaction_type.name,
+            "search_query": interaction.search_query,
+            "recommendation_context": interaction.recommendation_context,
+            "recommendation_position": interaction.recommendation_position,
+            "session_id": interaction.session_id,
+            "extra_data": interaction.metadata or {},
+        },
+    )
+    interaction_id = str(result.scalar_one())
+    await session.commit()
 
-    interaction_id = str(uuid4())
+    # Update user preferences and invalidate cache
+    prefs = UserPreferenceService(session)
+    await prefs.update_user_preference(interaction.user_id)
+    redis_client = await get_redis_client()
+    cache = CacheService(redis_client)
+    await cache.delete(f"user_emb:{interaction.user_id}")
+    await cache.delete(f"user_prefs:{interaction.user_id}")
 
     return InteractionResponse(
         success=True,
@@ -148,6 +198,7 @@ async def track_interaction(interaction: InteractionRequest) -> InteractionRespo
 @router.post("/batch", response_model=BatchInteractionResponse)
 async def track_interactions_batch(
     request: BatchInteractionRequest,
+    session: AsyncSession = Depends(get_session),
 ) -> BatchInteractionResponse:
     """
     Track multiple user interactions in a single request.
@@ -168,10 +219,58 @@ async def track_interactions_batch(
             detail="interactions list must not be empty",
         )
 
-    # TODO: Implement batch interaction recording
-    # 1. Validate all interactions
-    # 2. Batch insert into database
-    # 3. Publish events for async processing
+    insert_query = text("""
+        INSERT INTO recommender.user_interactions
+        (
+            external_user_id,
+            external_product_id,
+            interaction_type,
+            search_query,
+            recommendation_context,
+            recommendation_position,
+            session_id,
+            extra_data
+        )
+        VALUES
+        (
+            :user_id,
+            :product_id,
+            :interaction_type,
+            :search_query,
+            :recommendation_context,
+            :recommendation_position,
+            :session_id,
+            :extra_data
+        )
+    """).bindparams(bindparam("extra_data", type_=JSONB))
+
+    payloads = [
+        {
+            "user_id": interaction.user_id,
+            "product_id": interaction.product_id,
+            "interaction_type": interaction.interaction_type.name,
+            "search_query": interaction.search_query,
+            "recommendation_context": interaction.recommendation_context,
+            "recommendation_position": interaction.recommendation_position,
+            "session_id": interaction.session_id,
+            "extra_data": interaction.metadata or {},
+        }
+        for interaction in request.interactions
+    ]
+
+    await session.execute(insert_query, payloads)
+    await session.commit()
+
+    # Update preferences for affected users and invalidate caches
+    affected_users = {interaction.user_id for interaction in request.interactions}
+    prefs = UserPreferenceService(session)
+    for user_id in affected_users:
+        await prefs.update_user_preference(user_id)
+    redis_client = await get_redis_client()
+    cache = CacheService(redis_client)
+    for user_id in affected_users:
+        await cache.delete(f"user_emb:{user_id}")
+        await cache.delete(f"user_prefs:{user_id}")
 
     recorded_count = len(request.interactions)
     failed_count = 0

@@ -21,7 +21,7 @@ export interface User {
 }
 
 export const USERS: User[] = [
-  { id: "805b5c8c-ac76-4422-803b-80151c911fd3", name: "Wanjiku Muthoni" },
+  { id: "e2870a70-c59d-402c-9bbc-cc5d1c155782", name: "Mwende Kavuu" },
   { id: "b8355b11-784f-467b-b611-216fdb6dcd91", name: "Otieno Ochieng" },
   { id: "69b2bf41-1e9f-4753-95c8-43788297e692", name: "Akinyi Adhiambo" },
   { id: "f2de971c-12dd-4394-8557-87160be804d4", name: "Kipchoge Korir" },

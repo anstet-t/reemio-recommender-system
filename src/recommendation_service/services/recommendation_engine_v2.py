@@ -440,7 +440,7 @@ class HybridRecommendationEngine:
                 FROM recommender.user_interactions ui
                 WHERE ui.external_user_id IN (SELECT external_user_id FROM similar_users)
                 AND ui.external_product_id NOT IN (SELECT external_product_id FROM user_products)
-                AND ui.interaction_type IN ('PURCHASE', 'CART_ADD', 'WISHLIST_ADD')
+                AND lower(ui.interaction_type::text) IN ('purchase', 'cart_add', 'wishlist_add')
                 GROUP BY ui.external_product_id
                 ORDER BY frequency DESC
                 LIMIT :limit

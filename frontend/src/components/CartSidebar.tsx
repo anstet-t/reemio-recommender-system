@@ -32,7 +32,11 @@ export default function CartSidebar({ open, onClose }: CartSidebarProps) {
       return;
     }
     items.forEach((item) => {
-      trackInteraction(currentUser.id, item.product_id, "purchase");
+      trackInteraction({
+        user_id: currentUser.id,
+        product_id: item.product_id,
+        interaction_type: "purchase",
+      });
     });
     showToast("Order placed successfully!");
     clearCart();
